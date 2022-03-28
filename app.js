@@ -22,9 +22,7 @@ app.use('/',indexRouter);
 
 
 
-mongoose
-  .connect(
-    "mongodb+srv://Megha:megha*12345@cluster0.vi6gd.mongodb.net/PMS?retryWrites=true&w=majority",
+mongoose.connect("mongodb+srv://Megha:megha*12345@cluster0.vi6gd.mongodb.net/PMS?retryWrites=true&w=majority",
     {
       useNewUrlParser: true,
       useUnifiedTopology: true,

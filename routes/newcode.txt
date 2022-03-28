@@ -1,0 +1,615 @@
+const express = require("express");
+const router = express.Router();
+const userModel = require("../modules/users");
+const passcatModel = require("../modules/password_category");
+const passModel = require("../modules/add_password");
+let bcrypt = require("bcryptjs");
+let jwt = require('jsonwebtoken');
+const { decode } = require("jsonwebtoken");
+const { check, validationResult } = require('express-validator');
+const ObjectId = require("mongodb").ObjectID;
+
+
+//Get Home Page
+
+
+// var LocalStorage = require('node-localstorage').LocalStorage
+// localStorage = new LocalStorage('./scratch');
+
+if (typeof localStorage === "undefined" || localStorage === null) {
+    var LocalStorage = require('node-localstorage').LocalStorage;
+    localStorage = new LocalStorage('./scratch');
+}
+
+function chechLoginUser(req, res, next) {
+    console.log(" i am in...");
+    let userToken = localStorage.getItem('userToken');
+
+    try {
+
+        const decoded = jwt.verify(userToken, 'loginToken');
+        // req.user = decoded
+       // console.log(">>>", userToken, "----", decoded);
+
+        next()
+
+    } catch (err) {
+        res.redirect("/");
+    }
+}
+
+function checkemail(req, res, next) {
+    const email = req.body.email;
+    const checkexitemail = userModel.findOne({ email: email })
+    checkexitemail.exec((err, data) => {
+        if (err) throw err;
+
+        if (data) {
+
+            return res.render("signup", { title: "Password Management System", msg: "Email Already Exit" });
+
+        }
+
+        next();
+
+    })
+
+}
+
+
+function checkusername(req, res, next) {
+    const uname = req.body.uname;
+    const checkexitemail = userModel.findOne({ username: uname })
+    checkexitemail.exec((err, data) => {
+        if (err) throw err;
+
+        if (data) {
+
+            return res.render("signup", { title: "Password Management System", msg: "User Name Already Exit" });
+
+        }
+
+        next();
+
+    })
+
+}
+
+router.get("/", (req, res, next) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+    if (loginUser) {
+        res.redirect("./dashboard");
+    } else {
+
+        res.render("index", { title: "Password Management System", msg: "" });
+
+    }
+
+
+});
+
+router.post("/", (req, res, next) => {
+
+    const username = req.body.uname;
+    const password = req.body.password;
+    const checkUser = userModel.findOne({ username: username });
+    checkUser.exec((err, data) => {
+        if (err) throw err;
+        const getUserID = data._id;
+        const getPassword = data.password;
+       // console.log("----------", bcrypt.compareSync(password, getPassword))
+        if (bcrypt.compareSync(password, getPassword)) {
+
+            const token = jwt.sign({ userID: getUserID }, 'loginToken');
+            console.log(token);
+            localStorage.setItem("userToken", token);
+            localStorage.setItem('loginUser', username);
+
+            res.redirect("/dashboard");
+        } else {
+            res.render("index", { title: "Password Management System", msg: "Invalid Username and Password" });
+        }
+    })
+
+});
+
+router.get("/dashboard", chechLoginUser, (req, res, next) => {
+
+    // console.log("req.user",req.user);
+
+    const loginUser = localStorage.getItem("loginUser");
+
+   // return res.send({ loginUser: loginUser })
+
+    res.render("dashboard", { title: "Password Management System", loginUser: loginUser, msg: "" });
+});
+
+
+
+router.get("/signup", (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+    if (loginUser) {
+        res.redirect("./dashboard");
+    } else {
+
+        res.render("index", { title: "Password Management System", msg: "" });
+
+    }
+
+    res.render("signup", { title: "Password Management System", msg: "" });
+});
+
+router.post("/signup", checkusername, checkemail, (req, res) => {
+
+    const username = req.body.uname;
+    const email = req.body.email;
+    let password = req.body.password;
+    const confpassword = req.body.confpassword;
+
+    if (password != confpassword) {
+
+
+        res.render("signup", { title: "Password Management System", msg: "Password Not Match" });
+
+
+    } else {
+
+        password = bcrypt.hashSync(req.body.password, 10);
+
+        const userdetails = new userModel({
+            username: username,
+            email: email,
+            password: password
+
+        })
+
+        userdetails.save((err, doc) => {
+            if (err) throw err;
+
+
+            res.render("signup", { title: "Password Management System", msg: "User Registerd Successfully" });
+
+        });
+    }
+
+
+});
+
+router.get("/passwordCategory", chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    const getPassCat = passcatModel.find();
+
+    getPassCat.exec((err, data) => {
+
+        if (err) throw err;
+
+        res.render("password_category", { title: "Password Management System", loginUser: loginUser, records: data });
+
+    })
+
+
+});
+
+
+router.get("/passwordCategory/delete/:id", chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    const passcat_id = req.params.id;
+    console.log(passcat_id);
+
+    const passdelete = passcatModel.findByIdAndDelete(passcat_id);
+
+
+    passdelete.exec((err) => {
+
+        if (err) throw err;
+
+        res.redirect("/passwordCategory");
+
+    })
+
+
+});
+
+
+router.get("/passwordCategory/edit/:id", chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    const passcat_id = req.params.id;
+    console.log(passcat_id);
+
+    const getPassCat = passcatModel.findById(passcat_id);
+
+
+    getPassCat.exec((err, data) => {
+
+        if (err) throw err;
+
+        res.render("edit_pass_category", { title: "Password Management System", loginUser: loginUser, errors: '', success: '', records: data, id: passcat_id });
+
+    })
+
+
+});
+
+router.post("/passwordCategory/edit/", chechLoginUser, async (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    //const passcat_id= req.body.id;
+    // console.log(passcat_id);
+    // const passwordCategory= req.body.passwordCategory;
+
+    // let update_passcat = passcatModel .findByIdAndUpdate(req.body.id,{
+    //     Password_category:req.body.passwordCategory
+    // });
+
+
+    // update_passcat.exec((err,doc)=>{
+
+    //     if(err) throw err;
+
+    //     res.redirect("/passwordCategory");
+    // })  
+
+
+
+    console.log("==", req.body.id);
+
+    const update_category = await passcatModel.updateOne({ _id: ObjectId(req.body.id) }, {
+        $set: { Password_category: req.body.passwordCategory }
+
+    });
+
+    
+    if(update_category){
+
+        res.redirect("/passwordCategory");
+
+
+    }else{
+
+        console.log("Not redirect ....passwordcategory");
+
+    }
+  
+});
+
+
+router.get("/add-new-category", chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+    res.render("addNewCategory", { title: "Password Management System", loginUser: loginUser, errors: '', success: '' });
+});
+
+router.post("/add-new-category", chechLoginUser, [check('passwordCategory', 'Enter password Category name').isLength({ min: 1 }),], (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+
+        console.log("errors==>", errors);
+
+        //console.log(errors.mapped());
+        res.render("addNewCategory", { title: "Password Management System", loginUser: loginUser, errors: errors.mapped(), success: '' });
+
+    } else {
+
+        const passcatName = req.body.passwordCategory;
+        const passcatDetails = new passcatModel({
+            Password_category: passcatName
+        });
+
+        passcatDetails.save((err, doc) => {
+            if (err) throw err;
+
+            res.render("addNewCategory", { title: "Password Management System", loginUser: loginUser, errors: '', success: 'Password Category Inserted Successfully' });
+
+        })
+
+
+    }
+
+});
+
+router.get("/add-new-password", chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+    const getPassCat = passcatModel.find({});
+    getPassCat.exec((err,data)=>{
+        if(err) throw err;
+
+        res.render("add-new-password", { title: "Password Management System", loginUser: loginUser, records:data, success: ''});
+
+    })
+  
+});
+
+router.post("/add-new-password", chechLoginUser, async (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    const pass_cat = req.body.pass_cat;
+   const  project_name= req.body.project_name;
+    const pass_detail = req.body.pass_detail;
+
+   const  password_details = new passModel({
+        Password_category: pass_cat,
+        project_name:project_name,
+        Password_detail:pass_detail
+    })
+
+
+     const getSaveData = await password_details.save();
+
+     console.log("getSaveData", getSaveData);
+
+     const getPassCat = await passcatModel.find({});
+     console.log("getPassCat", getPassCat);
+
+
+    res.render("add-new-password", { title: "Password Management System", loginUser: loginUser,records:getPassCat, success:"Password Details Inserted Successfully"});
+
+
+    // password_details.save((err,doc)=>{
+
+    //     getPassCat.exec((err,data)=>{
+    //         if(err) throw err;
+    //      console.log(data)
+    //      res.render("add-new-password", { title: "Password Management System", loginUser: loginUser,records:data, success:"Password Details Inserted Successfully"});
+
+        
+    //     })
+    // })
+
+
+});
+
+router.get("/view-all-password", (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+    const getAllpass = passModel.find({});
+    getAllpass.exec((err,data)=>{
+        if(err) throw err;
+
+        res.render("view-all-password", { title: "Password Management System", loginUser: loginUser ,records:data});
+
+
+    });
+    });
+
+router.get("/logout", (req, res) => {
+    localStorage.removeItem("userToken");
+    localStorage.removeItem('loginUser');
+    res.redirect("/");
+});
+
+
+
+module.exports = router;
+
+
+///////////////////
+
+
+</div><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+    />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+    <script src="//cdn.ckeditor.com/4.18.0/full/ckeditor.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <title><%= title%></title>
+</head>
+<body>
+
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+          <div class="navbar-header">
+            <a class="navbar-brand" href="#">Password Management System</a>
+          </div>
+          <ul class="nav navbar-nav">
+            <li class="active"><a href="/">Home</a></li>
+            <li class="dropdown">
+              <a class="dropdown-toggle" data-toggle="dropdown" href="#">Password Category
+              <span class="caret"></span></a>
+              <ul class="dropdown-menu">
+                <li><a href="/add-new-category">Add New Category</a></li>
+                <li><a href="/passwordCategory">View All Category</a></li>
+                
+              </ul>
+            </li>
+            <li class="dropdown">
+                <a class="dropdown-toggle" data-toggle="dropdown" href="#">Password Details
+                <span class="caret"></span></a>
+                <ul class="dropdown-menu">
+                  <li><a href="/add-new-password">Add New Password</a></li>
+                  <li><a href="/view-all-password">View All Password</a></li>
+                  
+                </ul>
+              </li>
+          </ul>
+        </div>
+      </nav>
+    
+     
+      <div class="container">
+        <div class="row">
+              <h3 class="text-center"><%=title%></h3>
+             <div id="signupbox" style="margin-top:50px;" class="mainbox col-md-6 col-md-offset-2" >
+                <div class=" panel panel-info">
+                 <div class="panel-heading">
+                <div class="panel-title">Add New Password </div>
+                <div style="float:right ;font-size:85% ;position:relative;top:-10px"></div>
+               </div>
+                <div class="panel-body">
+                  <form action="/add-new-password" id="passwordform" class="form-horizontal" role="form" method="post" >
+  
+                    <%if(success !=''){%>
+                      <p style="align-items: center; color: green;"><%= success %></p> 
+                      <% } %>
+
+                    <div class="form-group">
+                        <label for="username" class="col-md-3 control-label">Password Category</label>
+                        <div class="col-md-9">
+                          <select name="pass_cat" id="" class="form-control">
+                            <option value="">Choose password category</option>
+                            <% if(records.length > 0){
+                              records.forEach(function(row){ %>
+                                <option value="<%= row.Password_category %>"><%= row.Password_category %></option>
+                            <% }) }  %>
+                           
+                          </select>
+                        </div>
+                        
+                    </div>
+
+                    <div class="form-group">
+                      <label for="username" class="col-md-3 control-label">Project Name</label>
+                      <div class="col-md-9">
+                          <input type="textbox" class="form-control" name="project_name"  placeholder="Enter Your Project Name">
+                      </div>
+                   </div>
+  
+
+                    <div class="form-group">
+                      <label for="username" class="col-md-3 control-label">Password Details</label>
+                      <div class="col-md-9">
+                        <textarea class="form-control" id="editor" name="pass_detail" rows="5" placeholder="Enter your Password Details "></textarea>
+                      </div>
+                      
+                    </div>
+
+                
+                    <div class="form-group">
+                      <div class="col-md-offset-3 col-md-9">
+                        <input type="submit"  class="btn btn-info" name="submit" value="Add Password">
+                      </div>
+                    </div>
+
+                    <p><a href="/view-all-password">View All Password Lists</a></p>
+                    
+                  </form>
+  
+                </div>
+  
+              </div>
+  
+           </div>
+          
+        </div>
+  
+    </div>
+     
+    <script>
+      CKEDITOR.replace( 'editor' );
+  </script>
+</body>
+</html>
+
+/////
+
+view all
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link
+      rel="stylesheet"
+      href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+    />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+    <title><%= title%></title>
+</head>
+<body>
+
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+          <div class="navbar-header">
+            <a class="navbar-brand" href="#">Password Management System</a>
+          </div>
+          <ul class="nav navbar-nav">
+            <li class="active"><a href="/">Home</a></li>
+            <li class="dropdown">
+              <a class="dropdown-toggle" data-toggle="dropdown" href="#">Password Category
+              <span class="caret"></span></a>
+              <ul class="dropdown-menu">
+                <li><a href="/add-new-category">Add New Category</a></li>
+                <li><a href="/passwordCategory">View All Category</a></li>
+                
+              </ul>
+            </li>
+            <li class="dropdown">
+                <a class="dropdown-toggle" data-toggle="dropdown" href="#">Password Details
+                <span class="caret"></span></a>
+                <ul class="dropdown-menu">
+                  <li><a href="/add-new-password">Add New Password</a></li>
+                  <li><a href="/view-all-password">View All Password</a></li>
+                  
+                </ul>
+              </li>
+              <li><a href="/logout">Logout</a></li>
+          </ul>
+          <div class="navbar-header" style="float:right"> <a class="navbar-brand" href="#">Loggedin As:<% if(loginUser){%> <%= loginUser %> <%}%> </a></div>
+        </div>
+      </nav>
+    
+    <div class="container">
+        <h1>View Password List</h1>
+        <table class="table table-striped table-primary">
+          <thead>
+            <tr>
+              <th>Password Category Name</th>
+              <th>Project Name</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+
+          <%if(records.length > 0){
+            records.forEach(function(row){%>        
+         
+          <tr>
+            
+            <td><%= row.Password_category%></td>
+            <td><%= row. project_name%></td>
+            <!-- <td>https://www.tutorial.com/wp-admin</td> -->
+            <td>
+              <button type="button" class="btn btn-info btn-xs" data-toggle="modal" data-target="#myModal<%= row._id %>"><i class="fa fa-eye"></i></button>
+              <a class="btn btn-primary btn-xs" href="/edit/"><i class="fa fa-edit"></i></a>
+            <a class="btn btn-danger btn-xs" href="/delete/"><i class="fa fa-trash"></i></a></td>
+            
+          </tr>
+
+        
+          <%  }) } %>
+    
+        </table>
+    
+      </div>
+</body>
+</html> 
