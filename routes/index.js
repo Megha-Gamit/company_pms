@@ -10,6 +10,7 @@ const { check, validationResult } = require('express-validator');
 const ObjectId = require("mongodb").ObjectID;
 
 
+
 //Get Home Page
 
 
@@ -371,15 +372,116 @@ router.post("/add-new-password", chechLoginUser, async (req, res) => {
 
 });
 
+/**
+
 router.get("/view-all-password",chechLoginUser, (req, res) => {
 
     const loginUser = localStorage.getItem("loginUser");
+
+    const perPage = 4;
+    const page = 1;
+
     const getAllpass = passModel.find({});
-    getAllpass.exec((err,data)=>{
+    getAllpass.skip((perPage * page) - perPage).limit(perPage).exec((err,data)=>{
         if(err) throw err;
 
-        res.render("view-all-password", { title: "Password Management System", loginUser: loginUser ,records:data});
+        passModel.countDocuments({}).exec((err,count)=>{
 
+            res.render("view-all-password", { title: "Password Management System", loginUser: loginUser ,
+            records:data,
+            current:page,
+            pages:Math.ceil(count/perPage)
+        
+        });
+
+        });
+
+    });
+ });
+
+
+
+router.get("/view-all-password/:page",chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    const perPage = 4;
+    const page = req.params.page || 1;
+
+    const getAllpass = passModel.find({});
+    getAllpass.skip((perPage * page) - perPage).limit(perPage).exec((err,data)=>{
+        if(err) throw err;
+
+        passModel.countDocuments({}).exec((err,count)=>{
+
+            res.render("view-all-password", { title: "Password Management System", loginUser: loginUser ,
+            records:data,
+            current:page,
+            pages:Math.ceil(count/perPage)
+        
+        });
+
+        });
+
+    });
+ });
+
+  */
+
+
+// pagintion using plugin 
+
+ router.get("/view-all-password",chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    var options = {
+       
+        offset:   1, 
+        limit:    3
+    };
+     
+
+    passModel.paginate({},options).then((result) =>{
+      //  if(err) throw err;
+
+       // console.log(result)
+       
+
+            res.render("view-all-password", { title: "Password Management System", loginUser: loginUser ,
+            records:result.docs,
+            current:result.offset,
+            pages:Math.ceil(result.total/result.limit)
+        
+        
+
+        });
+
+    });
+ });
+
+
+ router.get("/view-all-password/:page",chechLoginUser, (req, res) => {
+
+    const loginUser = localStorage.getItem("loginUser");
+
+    const perPage = 4;
+    const page = req.params.page || 1;
+
+    const getAllpass = passModel.find({});
+    getAllpass.skip((perPage * page) - perPage).limit(perPage).exec((err,data)=>{
+        if(err) throw err;
+
+        passModel.countDocuments({}).exec((err,count)=>{
+
+            res.render("view-all-password", { title: "Password Management System", loginUser: loginUser ,
+            records:data,
+            current:page,
+            pages:Math.ceil(count/perPage)
+        
+        });
+
+        });
 
     });
  });
@@ -442,7 +544,10 @@ router.get("/view-all-password",chechLoginUser, (req, res) => {
             //console.log(data);
            // console.log(data1);
 
-        res.render("edit_password_details", { title: "Password Management System", loginUser: loginUser, record:data, records:data1,success:"Password Updated Successfully"});
+           res.redirect("/view-all-password");
+
+
+      //  res.render("view-all-password", { title: "Password Management System", loginUser: loginUser, record:data, records:data1,success:"Password Updated Successfully"});
         });
 
     });

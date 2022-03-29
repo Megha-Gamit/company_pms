@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-
+var mongoosePaginate = require('mongoose-paginate');
 const passSchema = new mongoose.Schema({
     Password_category:{
         type:String,
@@ -21,6 +21,8 @@ const passSchema = new mongoose.Schema({
     }
 
 });
+
+passSchema.plugin(mongoosePaginate);
 
 const passModel = mongoose.model('password_details',passSchema);
 module.exports =  passModel;
