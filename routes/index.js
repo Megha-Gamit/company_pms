@@ -115,17 +115,6 @@ router.post("/", (req, res, next) => {
 
 });
 
-router.get("/dashboard", chechLoginUser, (req, res, next) => {
-
-    // console.log("req.user",req.user);
-
-    const loginUser = localStorage.getItem("loginUser");
-
-   // return res.send({ loginUser: loginUser })
-
-    res.render("dashboard", { title: "Password Management System", loginUser: loginUser, msg: "" });
-});
-
 
 
 router.get("/signup", (req, res) => {
@@ -178,146 +167,6 @@ router.post("/signup", checkusername, checkemail, (req, res) => {
 
 });
 
-router.get("/passwordCategory", chechLoginUser, (req, res) => {
-
-    const loginUser = localStorage.getItem("loginUser");
-
-    const getPassCat = passcatModel.find();
-
-    getPassCat.exec((err, data) => {
-
-        if (err) throw err;
-
-        res.render("password_category", { title: "Password Management System", loginUser: loginUser, records: data });
-
-    })
-
-
-});
-
-
-router.get("/passwordCategory/delete/:id", chechLoginUser, (req, res) => {
-
-    const loginUser = localStorage.getItem("loginUser");
-
-    const passcat_id = req.params.id;
-    console.log(passcat_id);
-
-    const passdelete = passcatModel.findByIdAndDelete(passcat_id);
-
-
-    passdelete.exec((err) => {
-
-        if (err) throw err;
-
-        res.redirect("/passwordCategory");
-
-    })
-
-
-});
-
-
-router.get("/passwordCategory/edit/:id", chechLoginUser, (req, res) => {
-
-    const loginUser = localStorage.getItem("loginUser");
-
-    const passcat_id = req.params.id;
-    console.log(passcat_id);
-
-    const getPassCat = passcatModel.findById(passcat_id);
-
-
-    getPassCat.exec((err, data) => {
-
-        if (err) throw err;
-
-        res.render("edit_pass_category", { title: "Password Management System", loginUser: loginUser, errors: '', success: '', records: data, id: passcat_id });
-
-    })
-
-
-});
-
-router.post("/passwordCategory/edit/", chechLoginUser, async (req, res) => {
-
-    const loginUser = localStorage.getItem("loginUser");
-
-    //const passcat_id= req.body.id;
-    // console.log(passcat_id);
-    // const passwordCategory= req.body.passwordCategory;
-
-    // let update_passcat = passcatModel .findByIdAndUpdate(req.body.id,{
-    //     Password_category:req.body.passwordCategory
-    // });
-
-
-    // update_passcat.exec((err,doc)=>{
-
-    //     if(err) throw err;
-
-    //     res.redirect("/passwordCategory");
-    // })  
-
-
-
-    console.log("==", req.body.id);
-
-    const update_category = await passcatModel.updateOne({ _id: ObjectId(req.body.id) }, {
-        $set: { Password_category: req.body.passwordCategory }
-
-    });
-
-    
-    if(update_category){
-
-        res.redirect("/passwordCategory");
-
-
-    }else{
-
-        console.log("Not redirect ....passwordcategory");
-
-    }
-  
-});
-
-
-router.get("/add-new-category", chechLoginUser, (req, res) => {
-
-    const loginUser = localStorage.getItem("loginUser");
-    res.render("addNewCategory", { title: "Password Management System", loginUser: loginUser, errors: '', success: '' });
-});
-
-router.post("/add-new-category", chechLoginUser, [check('passwordCategory', 'Enter password Category name').isLength({ min: 1 }),], (req, res) => {
-
-    const loginUser = localStorage.getItem("loginUser");
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-
-        console.log("errors==>", errors);
-
-        //console.log(errors.mapped());
-        res.render("addNewCategory", { title: "Password Management System", loginUser: loginUser, errors: errors.mapped(), success: '' });
-
-    } else {
-
-        const passcatName = req.body.passwordCategory;
-        const passcatDetails = new passcatModel({
-            Password_category: passcatName
-        });
-
-        passcatDetails.save((err, doc) => {
-            if (err) throw err;
-
-            res.render("addNewCategory", { title: "Password Management System", loginUser: loginUser, errors: '', success: 'Password Category Inserted Successfully' });
-
-        })
-
-
-    }
-
-});
 
 router.get("/add-new-password", chechLoginUser, (req, res) => {
 
@@ -430,7 +279,6 @@ router.get("/view-all-password/:page",chechLoginUser, (req, res) => {
 
 
 // pagintion using plugin 
-
  router.get("/view-all-password",chechLoginUser, (req, res) => {
 
     const loginUser = localStorage.getItem("loginUser");
